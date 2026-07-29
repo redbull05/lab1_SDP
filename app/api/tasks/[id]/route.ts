@@ -5,7 +5,7 @@ export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const id = params.id;
+  const id = await params;
   const body = await request.json();
   const { title, description, due_date, topic, status, is_archived } = body;
 
@@ -34,7 +34,7 @@ export async function PUT(
           if (err) {
             resolve(NextResponse.json({ error: 'Failed to fetch updated task' }, { status: 500 }));
           } else {
-            resolve(NextResponse.json(row));
+            resolve(NextResponse.json({id, ...body}));
           }
         });
       }
