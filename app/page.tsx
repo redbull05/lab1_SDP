@@ -48,12 +48,15 @@ export default function Home() {
           status,
         }),
       });
-       setTasks(prev => prev.map(t => 
-        t.id === editingTask.id 
-          ? { ...t, title, description, due_date: dueDate, topic, status } 
-          : t
-      ));
-        setEditingTask(null); 
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          Number(t.id) === Number(editingTask.id)
+            ? { ...t, title, description, due_date: dueDate, topic, status }
+            : t
+        )
+      );
+      setEditingTask(null);
     } else {
       await fetch('/api/tasks', {
         method: 'POST',
@@ -88,171 +91,272 @@ export default function Home() {
     setStatus('Todo');
   };
 
-    const handleStatusChange = async (id: number, newStatus: 'Todo' | 'In-Progress' | 'Complete') => {
-    // 1. Find the task
-    const taskToUpdate = tasks.find(t => t.id === id);
+  const handleStatusChange = async (id: number, newStatus: 'Todo' | 'In-Progress' | 'Complete') => {
+    const taskToUpdate = tasks.find((t) => Number(t.id) === Number(id));
     if (!taskToUpdate) return;
 
-    // 2. Send the update to the database
     const response = await fetch(`/api/tasks/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...taskToUpdate, status: newStatus }),
     });
 
-    // 3. Update the React state so the UI changes immediately
     if (response.ok) {
-      setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === id ? { ...task, status: newStatus } : task
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          Number(task.id) === Number(id) ? { ...task, status: newStatus } : task
         )
       );
-    } else {
-      console.error("Failed to update status");
     }
   };
 
-    const handleArchive = async (id: number) => {
-    // 1. Safe search converting both sides to numbers
-    const taskToArchive = tasks.find(t => Number(t.id) === Number(id));
-    
-    if (!taskToArchive) {
-      console.error("Could not find task with ID:", id);
-      return;
-    }
+  const handleArchive = async (id: number) => {
+    const taskToArchive = tasks.find((t) => Number(t.id) === Number(id));
+    if (!taskToArchive) return;
 
-    try {
-      // 2. Send the update to the backend
-      const response = await fetch(`/api/tasks/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...taskToArchive, is_archived: 1 }), 
-      });
+    const response = await fetch(`/api/tasks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...taskToArchive, is_archived: 1 }),
+    });
 
-      // 3. Mark as archived in React state
-      if (response.ok) {
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
-            Number(task.id) === Number(id) ? { ...task, is_archived: 1 } : task
-          )
-        );
-      } else {
-        console.error("Failed to archive task on server");
-      }
-    } catch (error) {
-      console.error("Network error while archiving:", error);
+    if (response.ok) {
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          Number(task.id) === Number(id) ? { ...task, is_archived: 1 } : task
+        )
+      );
     }
   };
 
   const sortedTasks = [...tasks]
-  .filter(task => showArchived ? true : Number(!task.is_archived) !== 1)
-  .sort((a, b) => {
-    if (sortBy === 'due_date') return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-    if (sortBy === 'topic') return a.topic.localeCompare(b.topic);
-    return a.status.localeCompare(b.status);
-  });
+    .filter((task) => (showArchived ? true : Number(task.is_archived) !== 1))
+    .sort((a, b) => {
+      if (sortBy === 'due_date') return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      if (sortBy === 'topic') return a.topic.localeCompare(b.topic);
+      return a.status.localeCompare(b.status);
+    });
 
   const isOverdue = (dueDate: string, status: string) => {
     return status !== 'Complete' && new Date(dueDate) < new Date(new Date().toDateString());
   };
 
-  return (
-    <main className="max-w-4xl mx-auto p-6 font-sans bg-white text-black min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">Local-First To-Do App</h1>
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Todo':
+        return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'In-Progress':
+        return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'Complete':
+        return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
 
-      {/* Task Form (Creation & Editing) */}
-      <form onSubmit={handleSubmit} className="bg-slate-100 p-4 rounded-lg mb-8 grid gap-4">
-        <h2 className="text-xl font-semibold mb-2">
-          {editingTask ? `Edit Task #${editingTask.id}` : 'Create New Task'}
-        </h2>
-        <input type="text" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required className="p-2 border rounded" />
-        <input type="text" placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} className="p-2 border rounded" />
-        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required className="p-2 border rounded" />
-        <input type="text" placeholder="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} required className="p-2 border rounded" />
-        <select value={status} onChange={(e) => setStatus(e.target.value as any)} className="p-2 border rounded">
-          <option value="Todo">Todo</option>
-          <option value="In-Progress">In-Progress</option>
-          <option value="Complete">Complete</option>
-        </select>
-        
-        <div className="flex gap-2">
-          <button type="submit" className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 flex-1">
-            {editingTask ? 'Save Changes' : 'Add Task'}
-          </button>
-          {editingTask && (
-            <button type="button" onClick={cancelEdit} className="bg-gray-400 text-white p-2 rounded hover:bg-gray-500">
-              Cancel
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-purple-100 via-indigo-50 to-blue-100 p-6 font-sans text-purple-950">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <header className="mb-8 text-center">
+          <h1 className="text-4xl font-extrabold tracking-tight text-purple-900 drop-shadow-sm">
+            Local-First To-Do App
+          </h1>
+          <p className="text-purple-600/80 text-sm mt-1 font-medium">
+            Organize your tasks with smooth pastel elegance
+          </p>
+        </header>
+
+        {/* Task Form Container */}
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-xl shadow-purple-900/5 border border-white/60 mb-8 grid gap-4 transition-all"
+        >
+          <h2 className="text-lg font-bold text-purple-900">
+            {editingTask ? `✨ Edit Task #${editingTask.id}` : '➕ Create New Task'}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              type="text"
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="p-3 border border-purple-200/80 rounded-xl bg-purple-50/40 text-purple-950 placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition"
+            />
+            <input
+              type="text"
+              placeholder="Topic"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              required
+              className="p-3 border border-purple-200/80 rounded-xl bg-purple-50/40 text-purple-950 placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition"
+            />
+          </div>
+
+          <textarea
+            placeholder="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="p-3 border border-purple-200/80 rounded-xl bg-purple-50/40 text-purple-950 placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition resize-none h-20"
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              required
+              className="p-3 border border-purple-200/80 rounded-xl bg-purple-50/40 text-purple-950 placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition"
+            />
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              className="p-3 border border-purple-200/80 rounded-xl bg-purple-50/40 text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition"
+            >
+              <option value="Todo">Todo</option>
+              <option value="In-Progress">In-Progress</option>
+              <option value="Complete">Complete</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3 mt-2">
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl hover:from-purple-600 hover:to-indigo-600 shadow-md shadow-purple-500/20 active:scale-[0.99] transition-all flex-1"
+            >
+              {editingTask ? 'Save Changes' : 'Add Task'}
             </button>
+            {editingTask && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="bg-blue-100 text-blue-700 font-semibold py-3 px-6 rounded-xl hover:bg-blue-200 transition"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* Task List Header & Controls */}
+        <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-purple-900">Task List</h2>
+            <button
+              type="button"
+              onClick={() => setShowArchived(!showArchived)}
+              className="text-xs px-3 py-1.5 bg-purple-200/60 hover:bg-purple-200 text-purple-800 rounded-lg font-medium border border-purple-300/50 transition"
+            >
+              {showArchived ? '👁️ Hide Archived' : '📦 Show Archived'}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-purple-700 uppercase tracking-wider">
+              Sort By:
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="p-2 border border-purple-200/80 rounded-xl bg-white/80 text-purple-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              <option value="due_date">Due Date</option>
+              <option value="topic">Topic</option>
+              <option value="status">Status</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Task Cards */}
+        <div className="space-y-4">
+          {sortedTasks.length === 0 ? (
+            <div className="text-center py-12 bg-white/40 rounded-2xl border border-purple-100">
+              <p className="text-purple-400 font-medium">No tasks found. Add one above!</p>
+            </div>
+          ) : (
+            sortedTasks.map((task) => {
+              const overdue = isOverdue(task.due_date, task.status);
+              const isArchived = Number(task.is_archived) === 1;
+
+              return (
+                <div
+                  key={task.id}
+                  className={`p-5 rounded-2xl border transition-all duration-200 shadow-md ${
+                    isArchived
+                      ? 'bg-purple-50/40 border-purple-100 opacity-60'
+                      : 'bg-white/80 backdrop-blur-sm border-white/80 shadow-purple-900/5 hover:shadow-purple-900/10'
+                  }`}
+                >
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={`text-lg font-bold ${isArchived ? 'line-through text-purple-400' : 'text-purple-950'}`}>
+                          {task.title}
+                        </h3>
+                        {isArchived && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-200 text-purple-700 font-medium">
+                            Archived
+                          </span>
+                        )}
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold ${getStatusBadge(task.status)}`}>
+                          {task.status}
+                        </span>
+                      </div>
+
+                      {task.description && (
+                        <p className="text-purple-800/80 text-sm leading-relaxed">{task.description}</p>
+                      )}
+
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-purple-600/80 pt-1">
+                        <span>
+                          🏷️ Topic: <strong className="text-purple-900">{task.topic}</strong>
+                        </span>
+                        <span className={overdue ? 'text-rose-600 font-bold' : ''}>
+                          📅 Due: {task.due_date} {overdue && '⚠️ OVERDUE'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-2 items-end">
+                      <select
+                        value={task.status}
+                        disabled={isArchived}
+                        onChange={(e) => handleStatusChange(task.id, e.target.value as any)}
+                        className="p-1.5 border border-purple-200 rounded-lg text-xs bg-purple-50/50 text-purple-900 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      >
+                        <option value="Todo">Todo</option>
+                        <option value="In-Progress">In-Progress</option>
+                        <option value="Complete">Complete</option>
+                      </select>
+
+                      {!isArchived && (
+                        <div className="flex gap-3 text-xs font-semibold pt-1">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(task)}
+                            className="text-indigo-600 hover:text-indigo-800 transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleArchive(task.id)}
+                            className="text-rose-500 hover:text-rose-700 transition"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
-      </form>
-
-      {/* Sorting Control */}
-          {/* Sorting Control */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold">Task List</h2>
-          <button 
-            type="button"
-            onClick={() => setShowArchived(!showArchived)}
-            className="text-sm px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-black font-medium"
-          >
-            {showArchived ? 'Hide Archived' : 'Show Archived'}
-          </button>
-        </div>
-        <div>
-          <label className="mr-2 text-sm font-medium">Sort By:</label>
-        </div>
-      </div>
-
-      {/* Task List */}
-      <div className="space-y-4">
-        {sortedTasks.map((task) => {
-          const overdue = isOverdue(task.due_date, task.status);
-          return (
-            <div key={task.id} className={`p-4 border rounded-lg shadow-sm ${task.is_archived ? 'bg-gray-200 opacity-75' : 'bg-white'}`}>
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-bold">
-                    {task.title} {task.is_archived ? '(Archived)' : ''}
-                  </h3>
-                  <p className="text-gray-600">{task.description}</p>
-                  <p className="text-sm text-gray-500 mt-1">Topic: <span className="font-semibold">{task.topic}</span></p>
-                  <p className={`text-sm mt-1 ${overdue ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                    Due: {task.due_date} {overdue && '⚠️ OVERDUE'}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <select 
-                    value={task.status} 
-                    disabled={task.is_archived === 1}
-                    onChange={(e) => handleStatusChange(task.id, e.target.value as any)}
-                    className="p-1 border rounded text-sm"
-                  >
-                    <option value="Todo">Todo</option>
-                    <option value="In-Progress">In-Progress</option>
-                    <option value="Complete">Complete</option>
-                  </select>
-
-                  {!task.is_archived && (
-                    <>
-                      <button onClick={() => startEdit(task)} className="text-sm text-blue-600 hover:underline text-right">
-                        Edit
-                      </button>
-                      <button 
-                        type = "button"
-                        onClick={() => handleArchive(task.id)} 
-                        className="text-sm text-red-600 hover:underline text-right"
-                        >
-                        Archive
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
       </div>
     </main>
   );
